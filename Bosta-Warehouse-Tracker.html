@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bosta Warehouse Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #f5f6fa;
+    --surface:     #ffffff;
+    --border:      #e2e5ed;
+    --border-light:#eef0f5;
+    --text:        #1a1d27;
+    --text-sub:    #6b7280;
+    --text-muted:  #9ca3af;
+    --primary:     #2563eb;
+    --primary-h:   #1d4ed8;
+    --success:     #16a34a;
+    --success-bg:  #f0fdf4;
+    --success-b:   #bbf7d0;
+    --danger:      #dc2626;
+    --danger-bg:   #fef2f2;
+    --danger-b:    #fecaca;
+    --warn:        #d97706;
+    --warn-bg:     #fffbeb;
+    --warn-b:      #fde68a;
+    --radius:      10px;
+    --shadow:      0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md:   0 4px 6px rgba(0,0,0,.06), 0 2px 4px rgba(0,0,0,.04);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px;
+    font-size: 14px;
+  }
+
+  /* ── Layout ── */
+  .wrapper { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-title { display: flex; align-items: center; gap: 12px; }
+  .header-title .icon {
+    width: 40px; height: 40px; background: #eff6ff;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .header-title h1 { font-size: 18px; font-weight: 700; color: var(--text); }
+  .header-title p  { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+  .header-actions  { display: flex; gap: 8px; }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .card-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+  .card-body { padding: 20px; }
+
+  /* ── Scanner Input ── */
+  .scanner-row { display: flex; gap: 10px; align-items: stretch; }
+  .scanner-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    color: var(--text);
+    background: #fff;
+    transition: border-color .15s;
+    font-family: inherit;
+    direction: ltr;
+    text-align: left;
+  }
+  .scanner-input:focus { outline: none; border-color: var(--primary); }
+  .scanner-input::placeholder { color: var(--text-muted); }
+
+  /* ── Counter badge ── */
+  .counter-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #eff6ff; color: var(--primary);
+    border-radius: 20px; padding: 2px 10px;
+    font-size: 12px; font-weight: 600;
+    min-width: 32px;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer; transition: background .15s, opacity .15s;
+    white-space: nowrap; font-family: inherit;
+  }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary  { background: var(--primary); color: #fff; }
+  .btn-primary:not(:disabled):hover { background: var(--primary-h); }
+  .btn-success  { background: var(--success); color: #fff; }
+  .btn-success:not(:disabled):hover { background: #15803d; }
+  .btn-outline  { background: #fff; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:not(:disabled):hover { background: var(--bg); }
+  .btn-danger-outline { background: #fff; color: var(--danger); border: 1px solid var(--danger-b); }
+  .btn-danger-outline:not(:disabled):hover { background: var(--danger-bg); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-xs { padding: 4px 9px; font-size: 11px; border-radius: 6px; }
+
+  /* ── Scan list ── */
+  .scan-list { display: flex; flex-direction: column; gap: 6px; }
+  .scan-chip {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 12px;
+    font-size: 13px; direction: ltr;
+  }
+  .scan-chip-num { font-weight: 600; color: var(--text); font-size: 14px; letter-spacing: .3px; }
+  .scan-chip-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 16px; line-height: 1;
+    padding: 0 2px; transition: color .1s;
+  }
+  .scan-chip-del:hover { color: var(--danger); }
+  .empty-state {
+    text-align: center; padding: 32px; color: var(--text-muted);
+    font-size: 13px;
+  }
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* ── Results Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; direction: ltr; }
+  thead th {
+    text-align: left; padding: 10px 14px;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 600; color: var(--text-sub);
+    text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
+  }
+  thead th.col-check { width: 40px; text-align: center; }
+  tbody tr { border-bottom: 1px solid var(--border-light); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #fafbfd; }
+  tbody td { padding: 10px 14px; font-size: 13px; color: var(--text); white-space: nowrap; }
+  tbody td.col-check { text-align: center; }
+
+  .order-name { font-weight: 700; font-size: 14px; color: var(--primary); }
+  .tracking-num { font-family: monospace; font-size: 13px; color: var(--text-sub); }
+
+  /* ── Status badges ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-success  { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-b); }
+  .badge-danger   { background: var(--danger-bg);  color: var(--danger);  border: 1px solid var(--danger-b);  }
+  .badge-warn     { background: var(--warn-bg);    color: var(--warn);    border: 1px solid var(--warn-b);    }
+  .badge-neutral  { background: #f3f4f6;           color: var(--text-sub); border: 1px solid var(--border);  }
+  .badge-blue     { background: #eff6ff;           color: var(--primary);  border: 1px solid #bfdbfe;        }
+
+  /* ── Checkbox ── */
+  input[type="checkbox"] {
+    width: 16px; height: 16px; cursor: pointer;
+    accent-color: var(--primary);
+  }
+
+  /* ── Action bar ── */
+  .action-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .select-all-label { font-size: 12px; color: var(--text-sub); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  /* ── Progress bar ── */
+  .progress-wrap { background: var(--border-light); border-radius: 4px; height: 6px; overflow: hidden; }
+  .progress-bar  { height: 100%; background: var(--primary); border-radius: 4px; transition: width .3s; }
+
+  /* ── Toast ── */
+  .toast-container { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast {
+    background: #1a1d27; color: #fff; padding: 10px 20px; border-radius: 8px;
+    font-size: 13px; box-shadow: var(--shadow-md);
+    animation: slideUp .2s ease;
+    white-space: nowrap;
+  }
+  .toast.success { background: var(--success); }
+  .toast.error   { background: var(--danger); }
+  @keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ── Log section ── */
+  .log-entry {
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  .log-entry-header {
+    background: var(--bg); padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--text-sub); gap: 12px; flex-wrap: wrap;
+  }
+  .log-entry-header strong { color: var(--text); font-size: 13px; }
+  .log-entry-body { padding: 10px 14px; }
+  .log-orders { display: flex; flex-wrap: wrap; gap: 6px; }
+  .log-order-tag {
+    background: #eff6ff; color: var(--primary);
+    border: 1px solid #bfdbfe; border-radius: 5px;
+    padding: 2px 8px; font-size: 12px; font-weight: 600;
+    direction: ltr;
+  }
+
+  /* ── Divider ── */
+  .divider { border: none; border-top: 1px solid var(--border-light); margin: 4px 0; }
+
+  /* ── Spinner ── */
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin .6s linear infinite; flex-shrink: 0;
+  }
+  .spinner-dark { border-color: rgba(0,0,0,.15); border-top-color: var(--primary); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 2px; background: var(--bg); border-radius: 8px; padding: 3px; }
+  .tab-btn {
+    flex: 1; padding: 7px 14px; border-radius: 6px; border: none;
+    font-size: 13px; font-weight: 500; cursor: pointer; background: none;
+    color: var(--text-sub); transition: all .15s; font-family: inherit;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Config row ── */
+  .config-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .config-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 200px; }
+  .config-field label { font-size: 12px; font-weight: 600; color: var(--text-sub); }
+  .config-field input {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 13px; color: var(--text); background: #fff; font-family: inherit;
+    direction: ltr;
+  }
+  .config-field input:focus { outline: none; border-color: var(--primary); }
+
+  /* ── Summary pills ── */
+  .summary-pills { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill {
+    display: flex; flex-direction: column; align-items: center;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 18px; min-width: 80px;
+  }
+  .pill-val { font-size: 22px; font-weight: 700; color: var(--text); }
+  .pill-lbl { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+  .pill.success .pill-val { color: var(--success); }
+  .pill.danger  .pill-val { color: var(--danger); }
+  .pill.warn    .pill-val { color: var(--warn); }
+
+  @media (max-width: 600px) {
+    .header { flex-direction: column; align-items: flex-start; }
+    .config-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">
+      <div class="icon">📦</div>
+      <div>
+        <h1>Bosta Warehouse Tracker</h1>
+        <p>مسح أرقام التتبع وتحديث حالة الشحنات على شوبيفاي</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline btn-sm" onclick="openSettings()">⚙ الإعدادات</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="card" style="padding:16px 20px;">
+    <div class="tabs" id="mainTabs">
+      <button class="tab-btn active" onclick="switchTab('scanner')">📷 السكانر</button>
+      <button class="tab-btn" onclick="switchTab('log')">📋 السجل</button>
+    </div>
+  </div>
+
+  <!-- ══ TAB: Scanner ══ -->
+  <div id="tab-scanner" class="tab-content active">
+
+    <!-- Step 1: Scan -->
+    <div class="card">
+      <div class="card-header">
+        <h2>الخطوة 1 — مسح أرقام التتبع</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="counter-badge" id="scanCount">0</span>
+          <button class="btn btn-danger-outline btn-sm" onclick="clearScans()">مسح الكل</button>
+        </div>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="scanner-row">
+          <input
+            id="scanInput"
+            class="scanner-input"
+            type="text"
+            inputmode="numeric"
+            placeholder="امسح الباركود هنا أو اكتب رقم التتبع..."
+            autocomplete="off"
+            autofocus
+          />
+          <button class="btn btn-outline" onclick="addManual()">إضافة يدوي</button>
+        </div>
+        <div id="scanList">
+          <div class="empty-state">
+            <div class="icon">🔍</div>
+            <div>لم يتم مسح أي أرقام بعد</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;">
+          <button class="btn btn-primary" id="lookupBtn" onclick="startLookup()" disabled>
+            🔎 استعلام بوسطة
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Results -->
+    <div class="card" id="resultsCard" style="display:none;">
+      <div class="card-header">
+        <h2>الخطوة 2 — النتائج</h2>
+        <div id="resultsSummaryPills" class="summary-pills"></div>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+
+        <!-- action bar -->
+        <div class="action-bar">
+          <label class="select-all-label">
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)" />
+            تحديد الكل
+          </label>
+          <button class="btn btn-success" id="updateBtn" onclick="startUpdate()" disabled>
+            ✅ تحديث شوبيفاي (Shipped)
+          </button>
+          <div style="margin-right:auto;">
+            <button class="btn btn-outline btn-sm" onclick="exportXLSX()">📥 تصدير XLSX</button>
+          </div>
+        </div>
+
+        <!-- progress -->
+        <div id="updateProgress" style="display:none;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-sub);margin-bottom:4px;">
+            <span>جاري التحديث...</span>
+            <span id="progressText">0 / 0</span>
+          </div>
+          <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+        </div>
+
+        <!-- table -->
+        <div class="table-wrap">
+          <table id="resultsTable">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" id="selectAllHead" onchange="toggleSelectAll(this.checked)" /></th>
+                <th>رقم الأوردر</th>
+                <th>رقم التتبع</th>
+                <th>حالة بوسطة</th>
+                <th>تحديث شوبيفاي</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-scanner -->
+
+  <!-- ══ TAB: Log ══ -->
+  <div id="tab-log" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h2>سجل العمليات</h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="loadLog()">🔄 تحديث</button>
+          <button class="btn btn-outline btn-sm" onclick="exportLogXLSX()">📥 تصدير XLSX</button>
+          <button class="btn btn-danger-outline btn-sm" onclick="clearLog()">🗑 مسح السجل</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="logContainer">
+          <div class="empty-state">
+            <div class="icon">📋</div>
+            <div>لا يوجد سجل بعد</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrapper -->
+
+<!-- Settings Modal -->
+<div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;" onclick="closeSettingsOutside(event)">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 40px rgba(0,0,0,.15);margin:16px;" onclick="event.stopPropagation()">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;">⚙ الإعدادات</h3>
+    <div class="config-row" style="flex-direction:column;">
+      <div class="config-field">
+        <label>Worker URL</label>
+        <input id="cfg_workerUrl" type="url" placeholder="https://bosta-warehouse-tracker-worker.xxx.workers.dev" />
+      </div>
+      <div class="config-field">
+        <label>Worker Secret</label>
+        <input id="cfg_secret" type="password" placeholder="WORKER_SECRET" />
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+      <button class="btn btn-outline" onclick="closeSettings()">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveSettings()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ══ Config ════════════════════════════════════════════════════════════════════
+const CFG_KEY = "bwt_config";
+
+function getConfig() {
+  try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch { return {}; }
+}
+function saveConfig(cfg) { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
+
+function openSettings() {
+  const cfg = getConfig();
+  document.getElementById("cfg_workerUrl").value = cfg.workerUrl || "";
+  document.getElementById("cfg_secret").value    = cfg.secret    || "";
+  document.getElementById("settingsModal").style.display = "flex";
+}
+function closeSettings()  { document.getElementById("settingsModal").style.display = "none"; }
+function closeSettingsOutside(e) { if (e.target === document.getElementById("settingsModal")) closeSettings(); }
+function saveSettings() {
+  const cfg = {
+    workerUrl: document.getElementById("cfg_workerUrl").value.trim().replace(/\/$/, ""),
+    secret:    document.getElementById("cfg_secret").value.trim(),
+  };
+  saveConfig(cfg);
+  closeSettings();
+  showToast("تم حفظ الإعدادات", "success");
+}
+
+// ══ Tabs ══════════════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+  document.getElementById("tab-" + tab).classList.add("active");
+  event.currentTarget.classList.add("active");
+  if (tab === "log") loadLog();
+}
+
+// ══ Scan State ════════════════════════════════════════════════════════════════
+let scannedNums = [];   // [ "123456", ... ]  — unique tracking numbers
+let resultsData = [];   // [ { trackingNumber, orderName, state, stateCode, found, shopifyStatus } ]
+
+// ══ Scanner ══════════════════════════════════════════════════════════════════
+document.getElementById("scanInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    const val = this.value.trim();
+    if (val) addTrackingNumber(val);
+    this.value = "";
+  }
+});
+
+function addManual() {
+  const inp = document.getElementById("scanInput");
+  const val = inp.value.trim();
+  if (val) addTrackingNumber(val);
+  inp.value = "";
+  inp.focus();
+}
+
+function addTrackingNumber(num) {
+  const clean = num.replace(/\D/g, ""); // أرقام فقط
+  if (!clean) { showToast("رقم التتبع يجب أن يحتوي على أرقام فقط", "error"); return; }
+  if (scannedNums.includes(clean)) { showToast(`${clean} موجود بالفعل`, "error"); return; }
+  scannedNums.push(clean);
+  renderScanList();
+  document.getElementById("lookupBtn").disabled = false;
+}
+
+function removeScanned(num) {
+  scannedNums = scannedNums.filter(n => n !== num);
+  renderScanList();
+  document.getElementById("lookupBtn").disabled = scannedNums.length === 0;
+  if (scannedNums.length === 0) {
+    document.getElementById("resultsCard").style.display = "none";
+    resultsData = [];
+  }
+}
+
+function clearScans() {
+  scannedNums = [];
+  resultsData = [];
+  renderScanList();
+  document.getElementById("lookupBtn").disabled = true;
+  document.getElementById("resultsCard").style.display = "none";
+}
+
+function renderScanList() {
+  const el = document.getElementById("scanList");
+  document.getElementById("scanCount").textContent = scannedNums.length;
+
+  if (scannedNums.length === 0) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>لم يتم مسح أي أرقام بعد</div></div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="scan-list">${
+    scannedNums.map((n, i) => `
+      <div class="scan-chip">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--text-muted);font-size:12px;">${i + 1}</span>
+          <span class="scan-chip-num">${n}</span>
+        </div>
+        <button class="scan-chip-del" onclick="removeScanned('${n}')" title="حذف">×</button>
+      </div>
+    `).join("")
+  }</div>`;
+}
+
+// ══ Lookup ════════════════════════════════════════════════════════════════════
+async function startLookup() {
+  const cfg = getConfig();
+  if (!cfg.workerUrl || !cfg.secret) { showToast("يرجى ضبط الإعدادات أولاً", "error"); openSettings(); return; }
+
+  const btn = document.getElementById("lookupBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner"></div> جاري الاستعلام...`;
+
+  try {
+    const resp = await fetch(`${cfg.workerUrl}/lookup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${cfg.secret}` },
+      body: JSON.stringify({ trackingNumbers: scannedNums }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+    resultsData = data.results.map(r => ({
+      ...r,
+      shopifyStatus: null,
+      selected: r.found,   // found → selected by default, not found → unselected
+    }));
+
+    renderResults();
+    document.getElementById("resultsCard").style.display = "";
+    showToast(`تم استعلام ${scannedNums.length} رقم`, "success");
+  } catch (err) {
+    showToast(`خطأ: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `🔎 استعلام بوسطة`;
+  }
+}
+
+// ══ Results Table ═════════════════════════════════════════════════════════════
+function renderResults() {
+  const tbody    = document.getElementById("resultsBody");
+  const found    = resultsData.filter(r => r.found).length;
+  const notFound = resultsData.filter(r => !r.found).length;
+
+  // Summary pills
+  document.getElementById("resultsSummaryPills").innerHTML = `
+    <div class="pill"><span class="pill-val">${resultsData.length}</span><span class="pill-lbl">إجمالي</span></div>
+    <div class="pill success"><span class="pill-val">${found}</span><span class="pill-lbl">موجود</span></div>
+    ${notFound > 0 ? `<div class="pill danger"><span class="pill-val">${notFound}</span><span class="pill-lbl">غير موجود</span></div>` : ""}
+  `;
+
+  tbody.innerHTML = resultsData.map((r, i) => {
+    const stateBadge = getStateBadge(r.stateCode, r.state);
+    const shopifyCell = getShopifyCell(r.shopifyStatus);
+    const orderCell = r.found
+      ? `<span class="order-name">${r.businessRef.startsWith("#") ? r.businessRef : "#" + r.businessRef}</span>`
+      : `<span class="badge badge-danger">غير موجود</span>`;
+
+    return `
+      <tr id="row-${i}">
+        <td class="col-check">
+          <input type="checkbox" id="chk-${i}"
+            ${r.selected ? "checked" : ""}
+            ${!r.found ? "disabled" : ""}
+            onchange="onRowCheck(${i}, this.checked)" />
+        </td>
+        <td>${orderCell}</td>
+        <td><span class="tracking-num">${r.trackingNumber}</span></td>
+        <td>${stateBadge}</td>
+        <td id="shopify-${i}">${shopifyCell}</td>
+      </tr>
+    `;
+  }).join("");
+
+  updateUpdateBtn();
+}
+
+function getStateBadge(code, label) {
+  if (!label) return `<span class="badge badge-neutral">—</span>`;
+  const cls = code === 45 ? "badge-success"
+            : code === 46 ? "badge-warn"
+            : [47,48,49,100].includes(code) ? "badge-danger"
+            : "badge-blue";
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function getShopifyCell(status) {
+  if (status === null)      return `<span class="badge badge-neutral">—</span>`;
+  if (status === "success") return `<span class="badge badge-success">✓ تم التحديث</span>`;
+  if (status === "error")   return `<span class="badge badge-danger">✗ فشل</span>`;
+  return `<span class="badge badge-neutral">—</span>`;
+}
+
+function onRowCheck(i, checked) {
+  resultsData[i].selected = checked;
+  syncSelectAllCheckbox();
+  updateUpdateBtn();
+}
+
+function toggleSelectAll(checked) {
+  resultsData.forEach((r, i) => {
+    if (r.found) {
+      r.selected = checked;
+      const chk = document.getElementById(`chk-${i}`);
+      if (chk) chk.checked = checked;
+    }
+  });
+  document.getElementById("selectAll").checked    = checked;
+  document.getElementById("selectAllHead").checked = checked;
+  updateUpdateBtn();
+}
+
+function syncSelectAllCheckbox() {
+  const foundItems = resultsData.filter(r => r.found);
+  const allChecked = foundItems.length > 0 && foundItems.every(r => r.selected);
+  document.getElementById("selectAll").checked     = allChecked;
+  document.getElementById("selectAllHead").checked = allChecked;
+}
+
+function updateUpdateBtn() {
+  const selected = resultsData.filter(r => r.found && r.selected).length;
+  const btn = document.getElementById("updateBtn");
+  btn.disabled = selected === 0;
+  btn.textContent = selected > 0
+    ? `✅ تحديث شوبيفاي (${selected} أوردر)`
+    : `✅ تحديث شوبيفاي (Shipped)`;
+}
+
+// ══ Shopify Update ════════════════════════════════════════════════════════════
+async function startUpdate() {
+  const cfg = getConfig();
+  if (!cfg.workerUrl || !cfg.secret) { showToast("يرجى ضبط الإعدادات أولاً", "error"); return; }
+
+  const toUpdate = resultsData.filter(r => r.found && r.selected);
+  if (toUpdate.length === 0) return;
+
+  const btn = document.getElementById("updateBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner"></div> جاري التحديث...`;
+
+  const progressWrap = document.getElementById("updateProgress");
+  const progressBar  = document.getElementById("progressBar");
+  const progressText = document.getElementById("progressText");
+  progressWrap.style.display = "";
+
+  const items = toUpdate.map(r => ({
+    orderName:     r.businessRef,
+    trackingNumber: r.trackingNumber,
+  }));
+
+  progressText.textContent = `0 / ${items.length}`;
+  progressBar.style.width  = "0%";
+
+  try {
+    const resp = await fetch(`${cfg.workerUrl}/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${cfg.secret}` },
+      body: JSON.stringify({ items }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+    // Update results status
+    const resultMap = {};
+    for (const r of data.results) resultMap[r.orderName.replace(/^#/, "")] = r;
+
+    let done = 0;
+    for (const r of resultsData) {
+      const key = String(r.businessRef || "").replace(/^#/, "");
+      const res = resultMap[key];
+      if (res) {
+        r.shopifyStatus = res.success ? "success" : "error";
+        const cell = document.getElementById(`shopify-${resultsData.indexOf(r)}`);
+        if (cell) cell.innerHTML = getShopifyCell(r.shopifyStatus);
+        done++;
+        progressText.textContent = `${done} / ${items.length}`;
+        progressBar.style.width  = `${Math.round(done / items.length * 100)}%`;
+      }
+    }
+
+    // Save to log
+    await saveToLog(toUpdate, data.results);
+
+    const succeeded = data.summary?.succeeded || 0;
+    const failed    = data.summary?.failed    || 0;
+    showToast(`تم: ${succeeded} ✓${failed > 0 ? " | فشل: " + failed : ""}`, succeeded > 0 ? "success" : "error");
+
+  } catch (err) {
+    showToast(`خطأ: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    updateUpdateBtn();
+    setTimeout(() => { progressWrap.style.display = "none"; }, 2000);
+  }
+}
+
+// ══ Log ═══════════════════════════════════════════════════════════════════════
+function nowFormatted() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return {
+    date: `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
+async function saveToLog(toUpdate, updateResults) {
+  const cfg = getConfig();
+  if (!cfg.workerUrl || !cfg.secret) return;
+
+  const { date, time } = nowFormatted();
+  const resultMap = {};
+  for (const r of updateResults) resultMap[r.orderName.replace(/^#/, "")] = r;
+
+  const orders = toUpdate.map(r => {
+    const key = String(r.businessRef || "").replace(/^#/, "");
+    const res = resultMap[key];
+    return {
+      orderName:     r.businessRef.startsWith("#") ? r.businessRef : "#" + r.businessRef,
+      trackingNumber: r.trackingNumber,
+      status:        res?.success ? "success" : "error",
+    };
+  });
+
+  const entry = { date, time, orders };
+
+  try {
+    await fetch(`${cfg.workerUrl}/log`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${cfg.secret}` },
+      body: JSON.stringify(entry),
+    });
+  } catch (_) {}
+}
+
+async function loadLog() {
+  const cfg = getConfig();
+  if (!cfg.workerUrl || !cfg.secret) {
+    document.getElementById("logContainer").innerHTML = `<div class="empty-state"><div class="icon">⚙</div><div>يرجى ضبط الإعدادات أولاً</div></div>`;
+    return;
+  }
+  document.getElementById("logContainer").innerHTML = `<div class="empty-state"><div class="spinner spinner-dark" style="margin:0 auto 8px"></div><div>جاري التحميل...</div></div>`;
+  try {
+    const resp = await fetch(`${cfg.workerUrl}/log`, {
+      headers: { "Authorization": `Bearer ${cfg.secret}` },
+    });
+    const data = await resp.json();
+    renderLog(data.log || []);
+  } catch (err) {
+    document.getElementById("logContainer").innerHTML = `<div class="empty-state"><div class="icon">❌</div><div>فشل التحميل: ${err.message}</div></div>`;
+  }
+}
+
+function renderLog(log) {
+  const el = document.getElementById("logContainer");
+  if (!log.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل بعد</div></div>`;
+    return;
+  }
+  el.innerHTML = log.map(entry => {
+    const successOrders = entry.orders.filter(o => o.status === "success");
+    const failOrders    = entry.orders.filter(o => o.status === "error");
+    return `
+      <div class="log-entry" style="margin-bottom:10px;">
+        <div class="log-entry-header">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <strong>${entry.date} ${entry.time}</strong>
+            <span class="badge badge-blue">${entry.orders.length} أوردر</span>
+            ${failOrders.length > 0 ? `<span class="badge badge-danger">${failOrders.length} فشل</span>` : ""}
+          </div>
+        </div>
+        <div class="log-entry-body">
+          <div class="log-orders">
+            ${successOrders.map(o => `
+              <div class="log-order-tag" title="${o.trackingNumber}">${o.orderName}</div>
+            `).join("")}
+            ${failOrders.map(o => `
+              <div class="log-order-tag" style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger-b);" title="${o.trackingNumber}">${o.orderName}</div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function clearLog() {
+  if (!confirm("هل أنت متأكد من مسح كامل السجل؟")) return;
+  const cfg = getConfig();
+  try {
+    await fetch(`${cfg.workerUrl}/log`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${cfg.secret}` },
+    });
+    showToast("تم مسح السجل", "success");
+    loadLog();
+  } catch (err) {
+    showToast(`خطأ: ${err.message}`, "error");
+  }
+}
+
+// ══ Export XLSX (Results) ══════════════════════════════════════════════════════
+function exportXLSX() {
+  if (!resultsData.length) { showToast("لا توجد بيانات للتصدير", "error"); return; }
+
+  const { date, time } = nowFormatted();
+  const rows = resultsData.map(r => ({
+    "رقم الأوردر":    r.found ? (r.businessRef.startsWith("#") ? r.businessRef : "#" + r.businessRef) : "—",
+    "رقم التتبع":     r.trackingNumber,
+    "حالة بوسطة":     r.state || "غير موجود",
+    "تحديث شوبيفاي":  r.shopifyStatus === "success" ? "تم التحديث" : r.shopifyStatus === "error" ? "فشل" : "—",
+    "التاريخ":         date,
+    "الوقت":           time,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "النتائج");
+  XLSX.writeFile(wb, `bosta-tracker-${date.replace(/\//g,"-")}-${time.replace(":","-")}.xlsx`);
+  showToast("تم التصدير", "success");
+}
+
+// ══ Export XLSX (Log) ══════════════════════════════════════════════════════════
+async function exportLogXLSX() {
+  const cfg = getConfig();
+  if (!cfg.workerUrl || !cfg.secret) { showToast("يرجى ضبط الإعدادات أولاً", "error"); return; }
+
+  try {
+    const resp = await fetch(`${cfg.workerUrl}/log`, {
+      headers: { "Authorization": `Bearer ${cfg.secret}` },
+    });
+    const data = await resp.json();
+    const log  = data.log || [];
+
+    if (!log.length) { showToast("السجل فارغ", "error"); return; }
+
+    const rows = [];
+    for (const entry of log) {
+      for (const o of entry.orders) {
+        rows.push({
+          "التاريخ":        entry.date,
+          "الوقت":          entry.time,
+          "رقم الأوردر":   o.orderName,
+          "رقم التتبع":    o.trackingNumber,
+          "الحالة":         o.status === "success" ? "تم التحديث" : "فشل",
+        });
+      }
+    }
+
+    const { date, time } = nowFormatted();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "السجل");
+    XLSX.writeFile(wb, `bosta-tracker-log-${date.replace(/\//g,"-")}.xlsx`);
+    showToast("تم تصدير السجل", "success");
+  } catch (err) {
+    showToast(`خطأ: ${err.message}`, "error");
+  }
+}
+
+// ══ Toast ══════════════════════════════════════════════════════════════════════
+function showToast(msg, type = "") {
+  const c = document.getElementById("toastContainer");
+  const t = document.createElement("div");
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ══ Auto-focus on scan input ═══════════════════════════════════════════════════
+document.addEventListener("click", e => {
+  const inp = document.getElementById("scanInput");
+  if (document.getElementById("settingsModal").style.display !== "none") return;
+  if (document.getElementById("tab-scanner").classList.contains("active") &&
+      !e.target.closest("button") &&
+      !e.target.closest("input") &&
+      !e.target.closest("table")) {
+    inp.focus();
+  }
+});
+</script>
+
+</body>
+</html>
