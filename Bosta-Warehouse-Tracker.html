@@ -387,6 +387,8 @@
                 <th class="col-check"><input type="checkbox" id="selectAllHead" onchange="toggleSelectAll(this.checked)" /></th>
                 <th>رقم الأوردر</th>
                 <th>رقم التتبع</th>
+                <th>نوع الأوردر</th>
+                <th>التاج</th>
                 <th>حالة بوسطة</th>
                 <th>تحديث شوبيفاي</th>
               </tr>
@@ -574,7 +576,10 @@ async function startLookup() {
     resultsData = data.results.map(r => ({
       ...r,
       shopifyStatus: null,
-      selected: r.found,   // found → selected by default, not found → unselected
+      selectedTag: r.found
+        ? ((r.orderType || "").toLowerCase() === "send" ? "Shipped" : "►►Shipped◄◄")
+        : null,
+      selected: r.found,
     }));
 
     renderResults();
@@ -608,6 +613,18 @@ function renderResults() {
       ? `<span class="order-name">${r.businessRef.startsWith("#") ? r.businessRef : "#" + r.businessRef}</span>`
       : `<span class="badge badge-danger">غير موجود</span>`;
 
+    const orderTypeBadge = r.found && r.orderType
+      ? (r.orderType.toLowerCase() === "send"
+          ? `<span class="badge badge-success">${r.orderType}</span>`
+          : `<span class="badge badge-warn">${r.orderType}</span>`)
+      : `<span class="badge badge-neutral">—</span>`;
+
+    const tagBadge = r.selectedTag
+      ? (r.selectedTag === "Shipped"
+          ? `<span class="badge badge-blue">Shipped</span>`
+          : `<span class="badge badge-warn">►►Shipped◄◄</span>`)
+      : `<span class="badge badge-neutral">—</span>`;
+
     return `
       <tr id="row-${i}">
         <td class="col-check">
@@ -618,6 +635,8 @@ function renderResults() {
         </td>
         <td>${orderCell}</td>
         <td><span class="tracking-num">${r.trackingNumber}</span></td>
+        <td>${orderTypeBadge}</td>
+        <td>${tagBadge}</td>
         <td>${stateBadge}</td>
         <td id="shopify-${i}">${shopifyCell}</td>
       </tr>
@@ -696,8 +715,9 @@ async function startUpdate() {
   progressWrap.style.display = "";
 
   const items = toUpdate.map(r => ({
-    orderName:     r.businessRef,
+    orderName:      r.businessRef,
     trackingNumber: r.trackingNumber,
+    orderType:      r.orderType || "",
   }));
 
   progressText.textContent = `0 / ${items.length}`;
@@ -768,9 +788,11 @@ async function saveToLog(toUpdate, updateResults) {
     const key = String(r.businessRef || "").replace(/^#/, "");
     const res = resultMap[key];
     return {
-      orderName:     r.businessRef.startsWith("#") ? r.businessRef : "#" + r.businessRef,
+      orderName:      r.businessRef.startsWith("#") ? r.businessRef : "#" + r.businessRef,
       trackingNumber: r.trackingNumber,
-      status:        res?.success ? "success" : "error",
+      orderType:      r.orderType || "",
+      tag:            r.selectedTag || "",
+      status:         res?.success ? "success" : "error",
     };
   });
 
@@ -859,6 +881,8 @@ function exportXLSX() {
   const rows = resultsData.map(r => ({
     "رقم الأوردر":    r.found ? (r.businessRef.startsWith("#") ? r.businessRef : "#" + r.businessRef) : "—",
     "رقم التتبع":     r.trackingNumber,
+    "نوع الأوردر":    r.orderType || "—",
+    "التاج":           r.selectedTag || "—",
     "حالة بوسطة":     r.state || "غير موجود",
     "تحديث شوبيفاي":  r.shopifyStatus === "success" ? "تم التحديث" : r.shopifyStatus === "error" ? "فشل" : "—",
     "التاريخ":         date,
@@ -894,6 +918,8 @@ async function exportLogXLSX() {
           "الوقت":          entry.time,
           "رقم الأوردر":   o.orderName,
           "رقم التتبع":    o.trackingNumber,
+          "نوع الأوردر":   o.orderType || "—",
+          "التاج":          o.tag || "—",
           "الحالة":         o.status === "success" ? "تم التحديث" : "فشل",
         });
       }
