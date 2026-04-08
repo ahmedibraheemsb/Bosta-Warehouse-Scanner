@@ -313,15 +313,25 @@
   <div id="tab-scanner" class="tab-content active">
 
     <!-- Step 1: Scan -->
-    <div class="card">
+    <div class="card" id="step1Card">
       <div class="card-header">
-        <h2>الخطوة 1 — مسح أرقام التتبع</h2>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <h2>الخطوة 1 — مسح أرقام التتبع</h2>
+          <!-- Counter pill - larger and prominent -->
+          <div style="display:flex;align-items:center;gap:6px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;padding:6px 14px;">
+            <span style="font-size:22px;font-weight:800;color:var(--primary);line-height:1;" id="scanCount">0</span>
+            <span style="font-size:11px;color:var(--text-sub);font-weight:500;">عدد الأوردرات</span>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <span class="counter-badge" id="scanCount">0</span>
           <button class="btn btn-danger-outline btn-sm" onclick="clearScans()">مسح الكل</button>
+          <button class="btn btn-primary" id="lookupBtn" onclick="startLookup()" disabled>
+            🔎 استعلام بوسطة
+          </button>
         </div>
       </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+      <!-- Collapsible body -->
+      <div id="step1Body" class="card-body" style="display:flex;flex-direction:column;gap:14px;">
         <div class="scanner-row">
           <input
             id="scanInput"
@@ -339,11 +349,6 @@
             <div class="icon">🔍</div>
             <div>لم يتم مسح أي أرقام بعد</div>
           </div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;">
-          <button class="btn btn-primary" id="lookupBtn" onclick="startLookup()" disabled>
-            🔎 استعلام بوسطة
-          </button>
         </div>
       </div>
     </div>
@@ -521,6 +526,7 @@ function removeScanned(num) {
   document.getElementById("lookupBtn").disabled = scannedNums.length === 0;
   if (scannedNums.length === 0) {
     document.getElementById("resultsCard").style.display = "none";
+    document.getElementById("step1Body").style.display = "flex";
     resultsData = [];
   }
 }
@@ -531,6 +537,8 @@ function clearScans() {
   renderScanList();
   document.getElementById("lookupBtn").disabled = true;
   document.getElementById("resultsCard").style.display = "none";
+  // نفتح الخطوة 1 تاني
+  document.getElementById("step1Body").style.display = "flex";
 }
 
 function renderScanList() {
@@ -584,6 +592,8 @@ async function startLookup() {
 
     renderResults();
     document.getElementById("resultsCard").style.display = "";
+    // Collapse الخطوة 1 بعد الاستعلام
+    document.getElementById("step1Body").style.display = "none";
     showToast(`تم استعلام ${scannedNums.length} رقم`, "success");
   } catch (err) {
     showToast(`خطأ: ${err.message}`, "error");
@@ -732,7 +742,7 @@ async function startUpdate() {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
 
-    // Update results status
+    // نحدث الجدول بالنتايج
     const resultMap = {};
     for (const r of data.results) resultMap[r.orderName.replace(/^#/, "")] = r;
 
