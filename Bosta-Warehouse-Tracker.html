@@ -324,6 +324,7 @@
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-outline btn-sm" id="toggleStep1Btn" onclick="toggleStep1()" style="display:none;">+ إضافة المزيد</button>
           <button class="btn btn-danger-outline btn-sm" onclick="clearScans()">مسح الكل</button>
           <button class="btn btn-primary" id="lookupBtn" onclick="startLookup()" disabled>
             🔎 استعلام بوسطة
@@ -527,6 +528,7 @@ function removeScanned(num) {
   if (scannedNums.length === 0) {
     document.getElementById("resultsCard").style.display = "none";
     document.getElementById("step1Body").style.display = "flex";
+    document.getElementById("toggleStep1Btn").style.display = "none";
     resultsData = [];
   }
 }
@@ -537,8 +539,17 @@ function clearScans() {
   renderScanList();
   document.getElementById("lookupBtn").disabled = true;
   document.getElementById("resultsCard").style.display = "none";
-  // نفتح الخطوة 1 تاني
   document.getElementById("step1Body").style.display = "flex";
+  document.getElementById("toggleStep1Btn").style.display = "none";
+}
+
+function toggleStep1() {
+  const body = document.getElementById("step1Body");
+  const btn  = document.getElementById("toggleStep1Btn");
+  const isHidden = body.style.display === "none";
+  body.style.display = isHidden ? "flex" : "none";
+  btn.textContent = isHidden ? "▲ إخفاء" : "+ إضافة المزيد";
+  if (isHidden) document.getElementById("scanInput").focus();
 }
 
 function renderScanList() {
@@ -581,7 +592,7 @@ async function startLookup() {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
 
-    resultsData = data.results.map(r => ({
+    const newResults = data.results.map(r => ({
       ...r,
       shopifyStatus: null,
       selectedTag: r.found
@@ -590,11 +601,20 @@ async function startLookup() {
       selected: r.found,
     }));
 
+    // Merge مع النتايج الموجودة — نحتفظ بالقديمة ونضيف الجديدة فقط
+    const existingTNs = new Set(resultsData.map(r => r.trackingNumber));
+    const merged = [...resultsData];
+    for (const r of newResults) {
+      if (!existingTNs.has(r.trackingNumber)) merged.push(r);
+    }
+    resultsData = merged;
+
     renderResults();
     document.getElementById("resultsCard").style.display = "";
-    // Collapse الخطوة 1 بعد الاستعلام
     document.getElementById("step1Body").style.display = "none";
-    showToast(`تم استعلام ${scannedNums.length} رقم`, "success");
+    document.getElementById("toggleStep1Btn").innerHTML = "+ إضافة المزيد";
+    document.getElementById("toggleStep1Btn").style.display = "";
+    showToast(`تم استعلام ${data.results.length} رقم — إجمالي: ${resultsData.length}`, "success");
   } catch (err) {
     showToast(`خطأ: ${err.message}`, "error");
   } finally {
